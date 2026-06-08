@@ -34,7 +34,6 @@ const recordFailure = async (testInfo: TestInfo, suggestionRegistry: SuggestionR
 
 export const test = base.extend<Fixtures>({
   suggestionRegistry: async ({ request: _request }, use) => {
-    void _request;
     const registry = new SuggestionRegistry();
     await use(registry);
   },

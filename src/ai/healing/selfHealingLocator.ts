@@ -9,7 +9,6 @@ export interface LocatorDefinition {
 
 export interface LocatorAttempt {
   locatorName: string;
-  selector: string;
   strategy: 'primary' | 'fallback';
   success: boolean;
 }
@@ -26,7 +25,6 @@ export class SelfHealingLocator {
 
       const attempt: LocatorAttempt = {
         locatorName: definition.name,
-        selector,
         strategy: index === 0 ? 'primary' : 'fallback',
         success: isVisible,
       };

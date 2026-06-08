@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - feature/playwright-ai-framework
-      - copilot/featureplaywright-ai-framework
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   qa-tests:

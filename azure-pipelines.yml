@@ -1,0 +1,35 @@
+trigger:
+  branches:
+    include:
+      - feature/playwright-ai-framework
+      - copilot/featureplaywright-ai-framework
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '20.x'
+
+  - script: npm ci
+    displayName: Install dependencies
+
+  - script: npx playwright install --with-deps chromium
+    displayName: Install Playwright browsers
+
+  - script: npm run lint
+    displayName: Lint
+
+  - script: npm run test:web:qa
+    displayName: Run web suite
+
+  - script: npm run test:api:qa
+    displayName: Run API suite
+
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'test-results/**/*.xml'
+      failTaskOnFailedTests: true

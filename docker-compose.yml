@@ -1,0 +1,9 @@
+services:
+  qa-runner:
+    build: .
+    environment:
+      - TEST_ENV=qa
+    volumes:
+      - ./playwright-report:/app/playwright-report
+      - ./test-results:/app/test-results
+    command: npm run test:all:qa

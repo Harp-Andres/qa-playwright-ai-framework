@@ -1,0 +1,16 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: qa-playwright-tests
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: qa-runner
+          image: qa-playwright-ai-framework:latest
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef:
+                name: qa-playwright-config
+  backoffLimit: 0

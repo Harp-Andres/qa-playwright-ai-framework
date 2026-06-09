@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { FailureSignal } from '../failure/failureAnalyzer';
 
-interface SuggestionRegistryModel {
+export interface SuggestionRegistryModel {
   failures: FailureSignal[];
 }
 

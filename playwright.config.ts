@@ -11,7 +11,7 @@ export default defineConfig({
   webServer: {
     command: 'node tests/mocks/mock-api-server.cjs',
     url: 'http://127.0.0.1:4010/health',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 30_000,
   },
   timeout: 60_000,

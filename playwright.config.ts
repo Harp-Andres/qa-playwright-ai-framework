@@ -12,7 +12,7 @@ export default defineConfig({
     command: 'node tests/mocks/mock-api-server.cjs',
     url: 'http://127.0.0.1:4010/health',
     reuseExistingServer: true,
-    timeout: 30_000,
+    timeout: 10_000,
   },
   timeout: 60_000,
   expect: {

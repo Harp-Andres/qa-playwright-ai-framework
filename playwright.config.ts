@@ -8,11 +8,21 @@ export default defineConfig({
   fullyParallel: true,
   retries: 1,
   workers: env.PARALLEL_WORKERS,
+  webServer: {
+    command: 'node tests/mocks/mock-api-server.cjs',
+    url: 'http://127.0.0.1:4010/health',
+    reuseExistingServer: !process.env.CI,
+    timeout: 30_000,
+  },
   timeout: 60_000,
   expect: {
     timeout: 10_000,
   },
-  reporter: [['html', { open: 'never' }], ['list'], ['junit', { outputFile: 'test-results/results.xml' }]],
+  reporter: [
+    ['html', { open: 'never' }],
+    ['list'],
+    ['junit', { outputFile: 'test-results/results.xml' }],
+  ],
   use: {
     baseURL: env.SAUCE_BASE_URL,
     trace: 'on-first-retry',

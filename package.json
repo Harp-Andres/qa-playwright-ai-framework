@@ -1,0 +1,63 @@
+{
+  "name": "qa-playwright-ai-framework",
+  "version": "1.0.0",
+  "description": "This repository hosts an advanced, scalable QA automation framework built with Playwright and TypeScript. Designed for modern testing needs, it includes:",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test:all:qa",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:web": "playwright test tests/web",
+    "test:api": "playwright test tests/api",
+    "test:all": "playwright test",
+    "test:web:local": "cross-env TEST_ENV=local npm run test:web",
+    "test:web:dev": "cross-env TEST_ENV=dev npm run test:web",
+    "test:web:qa": "cross-env TEST_ENV=qa npm run test:web",
+    "test:api:local": "cross-env TEST_ENV=local npm run test:api",
+    "test:api:dev": "cross-env TEST_ENV=dev npm run test:api",
+    "test:api:qa": "cross-env TEST_ENV=qa npm run test:api",
+    "test:all:qa": "cross-env TEST_ENV=qa npm run test:all",
+    "build": "tsc --noEmit",
+    "audit": "npm audit --audit-level=high",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Harp-Andres/qa-playwright-ai-framework.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Harp-Andres/qa-playwright-ai-framework/issues"
+  },
+  "homepage": "https://github.com/Harp-Andres/qa-playwright-ai-framework#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "pino": "^10.3.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.2",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "@typescript-eslint/parser": "^8.60.1",
+    "cross-env": "^10.1.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.3"
+  },
+  "lint-staged": {
+    "*.{ts,js,json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.ts": [
+      "eslint --fix"
+    ]
+  }
+}

@@ -9,7 +9,9 @@ export interface SuggestionRegistryModel {
 export class SuggestionRegistry {
   private readonly data: SuggestionRegistryModel;
 
-  constructor(private readonly path = 'artifacts/ai-suggestions.json') {
+  constructor(
+    private readonly path = `artifacts/ai-suggestions-${process.env.TEST_WORKER_INDEX ?? '0'}.json`,
+  ) {
     if (existsSync(path)) {
       this.data = JSON.parse(readFileSync(path, 'utf-8')) as SuggestionRegistryModel;
     } else {

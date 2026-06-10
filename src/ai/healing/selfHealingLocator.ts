@@ -21,7 +21,10 @@ export class SelfHealingLocator {
 
     for (const [index, selector] of selectors.entries()) {
       const locator = this.toLocator(selector);
-      const isVisible = await locator.first().isVisible({ timeout: 2_000 }).catch(() => false);
+      const isVisible = await locator
+        .first()
+        .isVisible({ timeout: 2_000 })
+        .catch(() => false);
 
       const attempt: LocatorAttempt = {
         locatorName: definition.name,
@@ -29,7 +32,10 @@ export class SelfHealingLocator {
         success: isVisible,
       };
 
-      logger.debug({ attempt }, 'Self-healing locator attempt');
+      logger.debug(
+        { strategy: attempt.strategy, success: attempt.success },
+        'Self-healing locator attempt',
+      );
 
       if (isVisible) {
         return locator;
@@ -41,8 +47,11 @@ export class SelfHealingLocator {
 
   private toLocator(selector: string): Locator {
     if (selector.startsWith('role=')) {
-      const [, role, rawName] = selector.split('=');
-      return this.page.getByRole(role as never, { name: rawName });
+      const withoutPrefix = selector.slice('role='.length);
+      const eqIdx = withoutPrefix.indexOf('=');
+      const role = eqIdx === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIdx);
+      const rawName = eqIdx === -1 ? undefined : withoutPrefix.slice(eqIdx + 1);
+      return this.page.getByRole(role as never, rawName ? { name: rawName } : undefined);
     }
 
     if (selector.startsWith('text=')) {

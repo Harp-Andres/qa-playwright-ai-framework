@@ -11,7 +11,7 @@
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
-    "types": ["node", "@playwright/test"],
+    "types": ["node"],
     "ignoreDeprecations": "6.0"
   },
   "include": ["src", "tests", "playwright.config.ts"]

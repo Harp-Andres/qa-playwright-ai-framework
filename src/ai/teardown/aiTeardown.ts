@@ -1,19 +1,36 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { FullConfig } from '@playwright/test';
 import { FlakinessDetector } from '../flakiness/flakinessDetector';
 import { AiSuggestionEngine } from '../suggestions/aiSuggestionEngine';
 import type { SuggestionRegistryModel } from '../suggestions/suggestionRegistry';
 
-const SUGGESTIONS_PATH = 'artifacts/ai-suggestions.json';
-const REPORT_PATH = 'artifacts/ai-report.json';
+const ARTIFACTS_DIR = 'artifacts';
+const REPORT_PATH = join(ARTIFACTS_DIR, 'ai-report.json');
 
-export default async function globalTeardown(_config: FullConfig): Promise<void> {
-  if (!existsSync(SUGGESTIONS_PATH)) {
-    return;
+function mergeWorkerFiles(): SuggestionRegistryModel {
+  const merged: SuggestionRegistryModel = { failures: [] };
+
+  if (!existsSync(ARTIFACTS_DIR)) {
+    return merged;
   }
 
-  const raw = JSON.parse(readFileSync(SUGGESTIONS_PATH, 'utf-8')) as SuggestionRegistryModel;
-  const signals = raw.failures ?? [];
+  const workerFiles = readdirSync(ARTIFACTS_DIR).filter((f) =>
+    /^ai-suggestions-\d+\.json$/.test(f),
+  );
+
+  for (const file of workerFiles) {
+    const raw = JSON.parse(
+      readFileSync(join(ARTIFACTS_DIR, file), 'utf-8'),
+    ) as SuggestionRegistryModel;
+    merged.failures.push(...(raw.failures ?? []));
+  }
+
+  return merged;
+}
+
+export default async function globalTeardown(_config: FullConfig): Promise<void> {
+  const { failures: signals } = mergeWorkerFiles();
 
   if (signals.length === 0) {
     return;
@@ -30,6 +47,6 @@ export default async function globalTeardown(_config: FullConfig): Promise<void>
     suggestions,
   };
 
-  mkdirSync('artifacts', { recursive: true });
+  mkdirSync(ARTIFACTS_DIR, { recursive: true });
   writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
 }

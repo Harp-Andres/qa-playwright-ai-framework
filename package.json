@@ -19,6 +19,7 @@
     "test:api:qa": "cross-env TEST_ENV=qa npm run test:api",
     "test:all:qa": "cross-env TEST_ENV=qa npm run test:all",
     "build": "tsc --noEmit",
+    "audit": "npm audit --audit-level=high",
     "prepare": "husky"
   },
   "repository": {

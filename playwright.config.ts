@@ -8,6 +8,7 @@ export default defineConfig({
   fullyParallel: true,
   retries: 1,
   workers: env.PARALLEL_WORKERS,
+  globalTeardown: './src/ai/teardown/aiTeardown',
   webServer: {
     command: 'node tests/mocks/mock-api-server.cjs',
     url: 'http://127.0.0.1:4010/health',

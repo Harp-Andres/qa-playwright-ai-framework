@@ -16,6 +16,8 @@ permissions:
   # Required by CodeQL analyze step to read workflow run metadata.
   actions: read
   security-events: write
+  # Required by gitleaks-action to fetch PR commits.
+  pull-requests: read
 
 jobs:
   codeql:

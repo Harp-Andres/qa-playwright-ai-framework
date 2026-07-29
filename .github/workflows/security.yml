@@ -32,7 +32,7 @@ jobs:
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && (github.repository_visibility == 'public' || vars.ENABLE_DEPENDENCY_REVIEW == 'true')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4

@@ -20,6 +20,10 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
+    # Code scanning requires GitHub Advanced Security (GHAS). On repositories
+    # where GHAS is not enabled the upload step fails with a configuration error;
+    # continue-on-error prevents that from blocking other jobs.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
@@ -32,6 +36,10 @@ jobs:
     name: Dependency Review
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    # Dependency Review requires GitHub Advanced Security (GHAS) and Dependency
+    # Graph to be enabled. continue-on-error prevents failures on repositories
+    # where those features are not available.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4

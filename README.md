@@ -1,5 +1,7 @@
 # QA Playwright AI Framework (ES/EN)
 
+**Reusable WEB + API automation framework** with Playwright and TypeScript. Use this repo as the shared foundation (POM, API clients, env config, structured logging, AI-ready helpers). Domain-specific demos (e.g. cruise search) live in separate sample repos.
+
 Framework de automatización QA escalable con **Playwright + TypeScript** para pruebas web y API, preparado para evolución AI/LLM sin promesas irreales.
 
 ## 1) Arquitectura / Architecture
@@ -106,6 +108,12 @@ npm run test:api:dev
 npm run test:api:qa
 
 npm run test:all:qa
+
+# Unit tests (no browser)
+npm run test:unit
+
+# End-to-end (Playwright)
+npm run test:e2e
 ```
 
 ## 7) CI/CD

@@ -1,7 +1,7 @@
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
-const schema = z.object({
+export const envSchema = z.object({
   TEST_ENV: z.enum(['local', 'dev', 'qa']).default('local'),
   SAUCE_BASE_URL: z.url(),
   SAUCE_USERNAME: z.string().min(1),
@@ -14,21 +14,33 @@ const schema = z.object({
   PARALLEL_WORKERS: z.coerce.number().int().min(1).max(20).default(4),
 });
 
-let cachedEnv: z.infer<typeof schema> | null = null;
+export type EnvConfig = z.infer<typeof envSchema>;
 
-export const getEnvConfig = (): z.infer<typeof schema> => {
+let cachedEnv: EnvConfig | null = null;
+
+export function parseEnvConfig(source: Record<string, string | undefined>): EnvConfig {
+  const result = envSchema.safeParse(source);
+
+  if (!result.success) {
+    throw new Error(
+      `Environment validation failed: ${JSON.stringify(result.error.format(), null, 2)}`,
+    );
+  }
+
+  return result.data;
+}
+
+export function resetEnvCache(): void {
+  cachedEnv = null;
+}
+
+export const getEnvConfig = (): EnvConfig => {
   if (cachedEnv) {
     return cachedEnv;
   }
 
   const target = process.env.TEST_ENV ?? 'local';
   loadEnv({ path: `.env.${target}`, override: true, quiet: true });
-  const result = schema.safeParse(process.env);
-
-  if (!result.success) {
-    throw new Error(`Environment validation failed: ${JSON.stringify(result.error.format(), null, 2)}`);
-  }
-
-  cachedEnv = result.data;
+  cachedEnv = parseEnvConfig(process.env);
   return cachedEnv;
 };

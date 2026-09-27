@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
+import { parseLocatorSelector } from './locatorSelector';
 
 export interface LocatorDefinition {
   name: string;
@@ -32,7 +33,7 @@ export class SelfHealingLocator {
         success: isVisible,
       };
 
-      logger.debug(
+      getLogger().debug(
         { strategy: attempt.strategy, success: attempt.success },
         'Self-healing locator attempt',
       );
@@ -46,26 +47,22 @@ export class SelfHealingLocator {
   }
 
   private toLocator(selector: string): Locator {
-    if (selector.startsWith('role=')) {
-      const withoutPrefix = selector.slice('role='.length);
-      const eqIdx = withoutPrefix.indexOf('=');
-      const role = eqIdx === -1 ? withoutPrefix : withoutPrefix.slice(0, eqIdx);
-      const rawName = eqIdx === -1 ? undefined : withoutPrefix.slice(eqIdx + 1);
-      return this.page.getByRole(role as never, rawName ? { name: rawName } : undefined);
-    }
+    const parsed = parseLocatorSelector(selector);
 
-    if (selector.startsWith('text=')) {
-      return this.page.getByText(selector.replace('text=', ''), { exact: false });
+    switch (parsed.kind) {
+      case 'role':
+        return this.page.getByRole(
+          (parsed.role ?? parsed.value) as never,
+          parsed.roleName ? { name: parsed.roleName } : undefined,
+        );
+      case 'text':
+        return this.page.getByText(parsed.value, { exact: false });
+      case 'testid':
+        return this.page.getByTestId(parsed.value);
+      case 'id':
+        return this.page.locator(`#${parsed.value}`);
+      default:
+        return this.page.locator(parsed.value);
     }
-
-    if (selector.startsWith('testid=')) {
-      return this.page.getByTestId(selector.replace('testid=', ''));
-    }
-
-    if (selector.startsWith('id=')) {
-      return this.page.locator(`#${selector.replace('id=', '')}`);
-    }
-
-    return this.page.locator(selector);
   }
 }

@@ -4,7 +4,10 @@
   "description": "This repository hosts an advanced, scalable QA automation framework built with Playwright and TypeScript. Designed for modern testing needs, it includes:",
   "main": "index.js",
   "scripts": {
-    "test": "npm run test:all:qa",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:e2e": "npm run test:all:qa",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -50,7 +53,8 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.0.7",
     "prettier": "^3.8.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^3.2.7"
   },
   "overrides": {
     "js-yaml": "^4.3.1",

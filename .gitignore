@@ -10,6 +10,7 @@ test-results/
 blob-report/
 pod-reports/
 artifacts/
+.kustomize-*/
 
 # env
 .env

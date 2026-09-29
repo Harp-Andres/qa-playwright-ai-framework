@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: qa-playwright-evidence-collector
+  labels:
+    app.kubernetes.io/name: qa-playwright
+    app.kubernetes.io/component: evidence-collector
+spec:
+  restartPolicy: Never
+  serviceAccountName: qa-playwright-runner
+  automountServiceAccountToken: false
+  activeDeadlineSeconds: 900
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    # Reuses the test image already on the node; kubectl cp needs its tar.
+    - name: collector
+      image: qa-playwright-ai-framework:latest
+      imagePullPolicy: IfNotPresent
+      command: ['sleep', '900']
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ['ALL']
+      resources:
+        requests:
+          cpu: '50m'
+          memory: 64Mi
+        limits:
+          cpu: '250m'
+          memory: 256Mi
+      volumeMounts:
+        - name: evidence
+          mountPath: /evidence
+          readOnly: true
+  volumes:
+    - name: evidence
+      persistentVolumeClaim:
+        claimName: qa-playwright-evidence
+        readOnly: true

@@ -31,6 +31,16 @@ describe('parseEnvConfig', () => {
     expect(config.TEST_ENV).toBe('local');
     expect(config.LOG_LEVEL).toBe('info');
     expect(config.PARALLEL_WORKERS).toBe(4);
+    expect(config.IGNORE_HTTPS_ERRORS).toBe(false);
+  });
+
+  it('parses IGNORE_HTTPS_ERRORS from a string flag', () => {
+    expect(parseEnvConfig({ ...validEnv, IGNORE_HTTPS_ERRORS: 'true' }).IGNORE_HTTPS_ERRORS).toBe(
+      true,
+    );
+    expect(parseEnvConfig({ ...validEnv, IGNORE_HTTPS_ERRORS: 'false' }).IGNORE_HTTPS_ERRORS).toBe(
+      false,
+    );
   });
 
   it('throws when required URLs are missing', () => {

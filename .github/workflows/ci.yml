@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint-build:
@@ -25,10 +28,33 @@ jobs:
       - run: npm run build
       - run: npm run test:unit
 
+  validate-k8s:
+    name: Validate Kubernetes manifests
+    runs-on: ubuntu-latest
+    env:
+      KUBECONFORM_VERSION: v0.8.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+      - name: Render with Kustomize and validate
+        run: |
+          for dir in k8s k8s/collector; do
+            echo "Validating ${dir}"
+            kubectl kustomize "${dir}" | kubeconform -strict -summary
+          done
+
   e2e-k8s:
     name: Playwright on Kubernetes
-    needs: lint-build
+    needs: [lint-build, validate-k8s]
+    permissions:
+      contents: read
+      packages: write
     uses: ./.github/workflows/playwright-k8s.yml
+    with:
+      push-image: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
   deploy-pages:
     name: Publish official Playwright report
@@ -37,6 +63,8 @@ jobs:
     if: >-
       always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       (needs.e2e-k8s.result == 'success' || needs.e2e-k8s.result == 'failure')
+    # A Pages outage must not turn CI red and block the CD image promotion.
+    continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
       pages: write

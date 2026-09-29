@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
   pull_request:
   schedule:
     # Weekly scan every Monday at 06:00 UTC
@@ -15,6 +14,10 @@ permissions:
   actions: read
   pull-requests: read
   security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   codeql:

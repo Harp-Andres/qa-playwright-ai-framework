@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: qa-playwright
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - job.yaml
+
+# Public SauceDemo and ReqRes demo credentials. Real secrets never go in git.
+secretGenerator:
+  - name: qa-playwright-credentials
+    envs:
+      - credentials.env
+
+images:
+  - name: qa-playwright-ai-framework
+    newTag: latest
+
+replacements:
+  - source:
+      kind: Job
+      name: qa-playwright-tests
+      fieldPath: spec.completions
+    targets:
+      - select:
+          kind: ConfigMap
+          name: qa-playwright-config
+        fieldPaths:
+          - data.SHARD_TOTAL

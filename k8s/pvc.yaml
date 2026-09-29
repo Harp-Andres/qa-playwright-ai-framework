@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qa-playwright-evidence
+  labels:
+    app.kubernetes.io/name: qa-playwright
+spec:
+  # ReadWriteOnce is enough on single-node kind. A multi-node cluster needs a
+  # ReadWriteMany storage class so shards on different nodes share the volume.
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

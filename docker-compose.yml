@@ -1,6 +1,8 @@
 services:
   qa-runner:
     build: .
+    # Chromium needs more than Docker's default 64 MB of /dev/shm.
+    shm_size: '1gb'
     environment:
       - TEST_ENV=qa
     volumes:

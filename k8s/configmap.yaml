@@ -2,16 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: qa-playwright-config
+  labels:
+    app.kubernetes.io/name: qa-playwright
 data:
   TEST_ENV: qa
   SAUCE_BASE_URL: https://www.saucedemo.com
-  SAUCE_USERNAME: standard_user
-  SAUCE_PASSWORD: secret_sauce
   REQRES_BASE_URL: http://127.0.0.1:4010
-  REQRES_EMAIL: eve.holt@reqres.in
-  REQRES_PASSWORD: cityslicka
   FAKESTORE_BASE_URL: http://127.0.0.1:4010
   LOG_LEVEL: info
   PARALLEL_WORKERS: '1'
-  # Keep this equal to spec.completions in k8s/job.yaml.
-  SHARD_TOTAL: '2'
+  IGNORE_HTTPS_ERRORS: 'false'
+  # Filled from spec.completions of the Job by kustomization.yaml.
+  SHARD_TOTAL: '0'

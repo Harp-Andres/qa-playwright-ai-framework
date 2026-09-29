@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Builds the test image, runs one indexed Playwright pod per shard, copies each
-# pod's evidence, and merges the blob reports with Playwright itself.
+# Builds the test image once, runs one indexed Playwright pod per shard, reads
+# the shared evidence volume through a collector pod, and merges the blob
+# reports with Playwright itself.
 set -euo pipefail
 
 CLUSTER_NAME="${CLUSTER_NAME:-qa-playwright}"
 IMAGE="${IMAGE:-qa-playwright-ai-framework:latest}"
+SKIP_BUILD="${SKIP_BUILD:-false}"
 KIND_VERSION="${KIND_VERSION:-v0.33.0}"
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5}"
+TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-1500}"
+NAMESPACE="qa-playwright"
 JOB_NAME="qa-playwright-tests"
-TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-900}"
+COLLECTOR="qa-playwright-evidence-collector"
+PVC="qa-playwright-evidence"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${root}"
@@ -16,101 +21,125 @@ cd "${root}"
 install_binary() {
   local name="$1"
   local url="$2"
-  if command -v "${name}" >/dev/null 2>&1; then
-    return
-  fi
   curl -fsSL -o "/tmp/${name}" "${url}"
   chmod +x "/tmp/${name}"
   sudo mv "/tmp/${name}" "/usr/local/bin/${name}"
 }
 
-install_binary kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
-kubectl_version="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
-install_binary kubectl "https://dl.k8s.io/release/${kubectl_version}/bin/linux/amd64/kubectl"
+if ! command -v kind >/dev/null 2>&1; then
+  install_binary kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+fi
+if ! command -v kubectl >/dev/null 2>&1; then
+  install_binary kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+fi
+
+# Renders a kustomization with the image under test, without editing tracked files.
+render() {
+  local tmp
+  tmp="$(mktemp -d "${root}/.kustomize-XXXXXX")"
+  cat > "${tmp}/kustomization.yaml" <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../$1
+images:
+  - name: qa-playwright-ai-framework
+    newName: ${IMAGE%:*}
+    newTag: ${IMAGE##*:}
+EOF
+  kubectl kustomize "${tmp}"
+  rm -rf "${tmp}"
+}
 
 if ! kind get clusters 2>/dev/null | grep -qx "${CLUSTER_NAME}"; then
   kind create cluster --name "${CLUSTER_NAME}" --image "${KIND_NODE_IMAGE}"
 fi
 
-docker build -t "${IMAGE}" .
+if [[ "${SKIP_BUILD}" != "true" ]]; then
+  docker build -t "${IMAGE}" .
+fi
 kind load docker-image "${IMAGE}" --name "${CLUSTER_NAME}"
 
-kubectl apply -f k8s/configmap.yaml
-kubectl delete job "${JOB_NAME}" --ignore-not-found=true
-kubectl apply -f k8s/job.yaml
+# Each run starts from an empty evidence volume.
+kubectl -n "${NAMESPACE}" delete pod "${COLLECTOR}" --ignore-not-found=true --wait=true 2>/dev/null || true
+kubectl -n "${NAMESPACE}" delete job "${JOB_NAME}" --ignore-not-found=true --wait=true 2>/dev/null || true
+kubectl -n "${NAMESPACE}" delete pvc "${PVC}" --ignore-not-found=true --wait=true 2>/dev/null || true
+render k8s | kubectl apply -f -
 
 job_status=0
-completions="$(kubectl get job "${JOB_NAME}" -o jsonpath='{.spec.completions}')"
+completions="$(kubectl -n "${NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.spec.completions}')"
 deadline=$((SECONDS + TIMEOUT_SECONDS))
-ready_pods=0
+job_result=""
 while (( SECONDS < deadline )); do
-  mapfile -t pods < <(kubectl get pods -l "job-name=${JOB_NAME}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-  ready_pods=0
-  for pod in "${pods[@]}"; do
-    [[ -z "${pod}" ]] && continue
-    if kubectl exec "${pod}" -- test -f /app/shard-exit-code >/dev/null 2>&1; then
-      ready_pods=$((ready_pods + 1))
-    fi
-  done
-  if (( ready_pods == completions )) && (( completions > 0 )); then
+  if [[ "$(kubectl -n "${NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" == "True" ]]; then
+    job_result="Complete"
     break
   fi
-  sleep 5
+  if [[ "$(kubectl -n "${NAMESPACE}" get job "${JOB_NAME}" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}')" == "True" ]]; then
+    job_result="Failed"
+    break
+  fi
+  sleep 10
 done
+echo "Job ${JOB_NAME} result: ${job_result:-timeout}"
+kubectl -n "${NAMESPACE}" get pods -l "batch.kubernetes.io/job-name=${JOB_NAME}" -o wide || true
 
-if (( ready_pods != completions )); then
-  echo "Timed out waiting for shard evidence"
-  kubectl describe job "${JOB_NAME}" || true
-  kubectl logs -l "job-name=${JOB_NAME}" --prefix --tail=200 || true
+if [[ "${job_result}" != "Complete" ]]; then
   job_status=1
+  kubectl -n "${NAMESPACE}" describe job "${JOB_NAME}" || true
+  for pod in $(kubectl -n "${NAMESPACE}" get pods -l "batch.kubernetes.io/job-name=${JOB_NAME}" --field-selector=status.phase=Failed -o name); do
+    kubectl -n "${NAMESPACE}" logs "${pod}" --tail=40 2>/dev/null | while IFS= read -r line; do
+      echo "::error title=${pod#pod/}::${line}"
+    done || true
+  done
 fi
 
 rm -rf pod-reports playwright-report test-results blob-report artifacts
 mkdir -p pod-reports playwright-report test-results blob-report artifacts
 
-mapfile -t pods < <(kubectl get pods -l "job-name=${JOB_NAME}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-for pod in "${pods[@]}"; do
-  [[ -z "${pod}" ]] && continue
-  dest="pod-reports/${pod}"
-  mkdir -p "${dest}/playwright-report" "${dest}/test-results" "${dest}/blob-report" "${dest}/artifacts"
-  kubectl cp "${pod}:/app/playwright-report/." "${dest}/playwright-report" || true
-  kubectl cp "${pod}:/app/test-results/." "${dest}/test-results" || true
-  if ! kubectl cp "${pod}:/app/blob-report/." "${dest}/blob-report"; then
-    echo "::error title=${pod}::could not copy blob-report from the pod"
+render k8s/collector | kubectl apply -f -
+# kubectl wait fails at once if the API does not list the new pod yet.
+collector_ready=false
+for _ in $(seq 1 18); do
+  if kubectl -n "${NAMESPACE}" wait --for=condition=Ready "pod/${COLLECTOR}" --timeout=10s 2>/dev/null; then
+    collector_ready=true
+    break
+  fi
+  sleep 2
+done
+if [[ "${collector_ready}" == "true" ]]; then
+  kubectl -n "${NAMESPACE}" cp "${COLLECTOR}:/evidence/." pod-reports || job_status=1
+else
+  echo "::error::evidence collector pod did not become ready"
+  kubectl -n "${NAMESPACE}" describe pod "${COLLECTOR}" || true
+  job_status=1
+fi
+kubectl -n "${NAMESPACE}" delete pod "${COLLECTOR}" --wait=false || true
+
+for (( shard = 1; shard <= completions; shard++ )); do
+  dest="pod-reports/shard-${shard}"
+  exit_code="$(tr -cd '0-9' < "${dest}/exit-code" 2>/dev/null || true)"
+  exit_code="${exit_code:-1}"
+  echo "::notice title=shard-${shard}::shard exit ${exit_code}"
+  if [[ "${exit_code}" != "0" ]]; then
     job_status=1
   fi
-  kubectl cp "${pod}:/app/artifacts/." "${dest}/artifacts" || true
 
   shopt -s nullglob
-  pod_zips=("${dest}/blob-report/"*.zip)
+  shard_zips=("${dest}/blob-report/"*.zip)
   shopt -u nullglob
-  if (( ${#pod_zips[@]} == 0 )); then
-    echo "::error title=${pod}::no blob report zip, this shard is missing from the merged report"
+  if (( ${#shard_zips[@]} == 0 )); then
+    echo "::error title=shard-${shard}::no blob report zip, this shard is missing from the merged report"
     job_status=1
   fi
-  for zip in "${pod_zips[@]}"; do
-    cp "${zip}" "blob-report/${pod}-$(basename "${zip}")"
+  for zip in "${shard_zips[@]}"; do
+    cp "${zip}" "blob-report/shard-${shard}-$(basename "${zip}")"
   done
 
   if [[ -d "${dest}/artifacts" ]]; then
-    mkdir -p "artifacts/${pod}"
-    cp -a "${dest}/artifacts/." "artifacts/${pod}/" || true
+    mkdir -p "artifacts/shard-${shard}"
+    cp -a "${dest}/artifacts/." "artifacts/shard-${shard}/" || true
   fi
-
-  raw_exit="$(kubectl exec "${pod}" -- cat /app/shard-exit-code 2>/dev/null | head -n 1 || true)"
-  exit_code="$(printf '%s' "${raw_exit}" | tr -cd '0-9')"
-  if [[ -z "${exit_code}" ]]; then
-    exit_code=1
-  fi
-  echo "Pod ${pod} shard exit ${exit_code}"
-  echo "::notice title=${pod}::shard exit ${exit_code}"
-  if [[ "${exit_code}" != "0" ]]; then
-    job_status=1
-    kubectl logs "${pod}" --tail=40 2>/dev/null | while IFS= read -r line; do
-      echo "::error title=${pod}::${line}"
-    done || true
-  fi
-  kubectl exec "${pod}" -- touch /app/shard-collected >/dev/null 2>&1 || true
 done
 
 merge_status=0
@@ -122,11 +151,13 @@ if (( ${#zips[@]} != completions )); then
   merge_status=1
 fi
 if (( ${#zips[@]} == 0 )); then
-  echo "No blob reports were collected from the pods"
+  echo "No blob reports were collected from the shards"
   merge_status=1
 else
   # merge-reports writes report.jsonl beside the blobs, so this mount stays writable.
   if ! docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
     --entrypoint npx \
     -v "${PWD}/blob-report:/blob" \
     -v "${PWD}/playwright-report:/app/playwright-report" \

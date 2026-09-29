@@ -12,6 +12,7 @@ export const envSchema = z.object({
   FAKESTORE_BASE_URL: z.url(),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   PARALLEL_WORKERS: z.coerce.number().int().min(1).max(20).default(4),
+  IGNORE_HTTPS_ERRORS: z.stringbool().default(false),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

@@ -2,6 +2,11 @@ name: Playwright on Kubernetes
 
 on:
   workflow_call:
+    inputs:
+      push-image:
+        description: Push the tested image to GHCR with its commit SHA tag.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -11,8 +16,14 @@ jobs:
     name: Playwright on Kubernetes
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Tag the image with the commit SHA
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}:sha-${GITHUB_SHA}" >> "$GITHUB_ENV"
 
       - name: Run Playwright Job on kind
         run: bash scripts/ci-playwright-k8s.sh
@@ -56,3 +67,14 @@ jobs:
           path: artifacts/
           retention-days: 14
           if-no-files-found: warn
+
+      - uses: docker/login-action@v3
+        if: success() && inputs.push-image
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the tested image
+        if: success() && inputs.push-image
+        run: docker push "${IMAGE}"

@@ -3,26 +3,47 @@ kind: Job
 metadata:
   name: qa-playwright-tests
   labels:
-    app: qa-playwright
+    app.kubernetes.io/name: qa-playwright
+    app.kubernetes.io/component: tests
 spec:
+  # One pod per shard. SHARD_TOTAL in the ConfigMap is copied from this value.
   completions: 2
   parallelism: 2
   completionMode: Indexed
-  backoffLimit: 0
+  # A failed shard does not stop the others, so every shard leaves evidence.
+  backoffLimitPerIndex: 0
+  activeDeadlineSeconds: 1500
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
-        app: qa-playwright
+        app.kubernetes.io/name: qa-playwright
+        app.kubernetes.io/component: tests
     spec:
       restartPolicy: Never
+      serviceAccountName: qa-playwright-runner
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: qa-runner
           image: qa-playwright-ai-framework:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           command: ['bash', '/app/scripts/k8s-playwright-shard.sh']
           envFrom:
             - configMapRef:
                 name: qa-playwright-config
+            - secretRef:
+                name: qa-playwright-credentials
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ['ALL']
           resources:
             requests:
               cpu: '250m'
@@ -37,7 +58,8 @@ spec:
               mountPath: /dev/shm
       volumes:
         - name: evidence
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: qa-playwright-evidence
         - name: dshm
           emptyDir:
             medium: Memory

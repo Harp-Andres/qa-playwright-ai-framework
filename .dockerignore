@@ -5,6 +5,7 @@ test-results
 blob-report
 pod-reports
 artifacts
+.kustomize-*
 coverage
 dist
 .git

@@ -1,21 +1,35 @@
-import { expect, type APIRequestContext } from '@playwright/test';
-import { getEnvConfig } from '../../config/env';
+import type { APIRequestContext } from '@playwright/test';
+import { readJson } from '../http/readJson';
+
+export interface ReqResAuthConfig {
+  baseUrl: string;
+  email: string;
+  password: string;
+}
+
+interface ReqResLoginBody {
+  token?: string;
+}
 
 export class ReqResClient {
-  constructor(private readonly request: APIRequestContext) {}
+  constructor(
+    private readonly request: APIRequestContext,
+    private readonly auth: ReqResAuthConfig,
+  ) {}
 
   async loginAndGetToken(): Promise<string> {
-    const env = getEnvConfig();
-    const response = await this.request.post(`${env.REQRES_BASE_URL}/api/login`, {
+    const response = await this.request.post(`${this.auth.baseUrl}/api/login`, {
       data: {
-        email: env.REQRES_EMAIL,
-        password: env.REQRES_PASSWORD,
+        email: this.auth.email,
+        password: this.auth.password,
       },
     });
+    const body = await readJson<ReqResLoginBody>(response);
 
-    expect(response.ok()).toBeTruthy();
-    const body = (await response.json()) as { token?: string };
-    expect(body.token, 'ReqRes token must exist').toBeTruthy();
-    return body.token as string;
+    if (!body.token) {
+      throw new Error('ReqRes login response did not include a token');
+    }
+
+    return body.token;
   }
 }

@@ -9,6 +9,7 @@ test.describe('Fake Store - Resources', () => {
 
   test('retrieves product by id and validates business fields', async ({ fakeStoreClient }) => {
     const product = await fakeStoreClient.getProductById(1);
+    expect(product.id).toBe(1);
     expect(product.title.length).toBeGreaterThan(3);
     expect(product.price).toBeGreaterThan(0);
   });

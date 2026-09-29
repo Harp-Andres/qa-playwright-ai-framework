@@ -1,5 +1,4 @@
 import { expect, type Page } from '@playwright/test';
-import { getEnvConfig } from '../../config/env';
 import { SelfHealingLocator } from '../../ai/healing/selfHealingLocator';
 import { loginSelectors } from '../selectors/login.selectors';
 
@@ -11,8 +10,7 @@ export class LoginPage {
   }
 
   async open(): Promise<void> {
-    const env = getEnvConfig();
-    await this.page.goto(env.SAUCE_BASE_URL);
+    await this.page.goto('/');
   }
 
   async login(username: string, password: string): Promise<void> {

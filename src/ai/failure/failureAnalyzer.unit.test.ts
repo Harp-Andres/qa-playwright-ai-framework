@@ -12,8 +12,10 @@ function makeTestInfo(partial: Partial<TestInfo> & { message?: string }): TestIn
 }
 
 describe('FailureAnalyzer', () => {
+  const analyzer = new FailureAnalyzer();
+
   it('classifies locator failures', () => {
-    const signal = FailureAnalyzer.analyze(
+    const signal = analyzer.analyze(
       makeTestInfo({ message: 'Self-healing locator failed for username' }),
       { file: 'login.spec.ts' },
     );
@@ -21,19 +23,29 @@ describe('FailureAnalyzer', () => {
     expect(signal.retry).toBe(1);
   });
 
+  it('classifies timeout failures', () => {
+    const signal = analyzer.analyze(makeTestInfo({ message: 'Timeout 30000ms exceeded' }), {});
+    expect(signal.category).toBe('timeout');
+  });
+
   it('classifies network failures', () => {
-    const signal = FailureAnalyzer.analyze(
-      makeTestInfo({ message: 'net::ERR_NAME_NOT_RESOLVED' }),
-      {},
-    );
+    const signal = analyzer.analyze(makeTestInfo({ message: 'net::ERR_NAME_NOT_RESOLVED' }), {});
     expect(signal.category).toBe('network');
   });
 
   it('classifies assertion failures', () => {
-    const signal = FailureAnalyzer.analyze(
-      makeTestInfo({ message: 'expect(received).toBe()' }),
-      {},
-    );
+    const signal = analyzer.analyze(makeTestInfo({ message: 'expect(received).toBe()' }), {});
     expect(signal.category).toBe('assertion');
+  });
+
+  it('lets a new strategy classify without changing the analyzer', () => {
+    const custom = new FailureAnalyzer([
+      {
+        category: 'network',
+        matches: (message: string) => message.includes('custom-net'),
+      },
+    ]);
+    const signal = custom.analyze(makeTestInfo({ message: 'custom-net down' }), {});
+    expect(signal.category).toBe('network');
   });
 });

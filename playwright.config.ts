@@ -16,21 +16,28 @@ export default defineConfig({
     timeout: 10_000,
   },
   timeout: 60_000,
+  outputDir: 'test-results',
   expect: {
     timeout: 10_000,
   },
   reporter: [
-    ['html', { open: 'never' }],
     ['list'],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }],
     ['junit', { outputFile: 'test-results/results.xml' }],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['blob', { outputDir: 'blob-report' }],
   ],
   use: {
     baseURL: env.SAUCE_BASE_URL,
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    ignoreHTTPSErrors: true,
+    trace: 'on',
+    screenshot: 'on',
+    video: 'on',
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    },
   },
   projects: [
     {

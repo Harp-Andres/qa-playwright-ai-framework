@@ -2,15 +2,43 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: qa-playwright-tests
+  labels:
+    app: qa-playwright
 spec:
+  completions: 2
+  parallelism: 2
+  completionMode: Indexed
+  backoffLimit: 0
   template:
+    metadata:
+      labels:
+        app: qa-playwright
     spec:
       restartPolicy: Never
       containers:
         - name: qa-runner
           image: qa-playwright-ai-framework:latest
           imagePullPolicy: Never
+          command: ['bash', '/app/scripts/k8s-playwright-shard.sh']
           envFrom:
             - configMapRef:
                 name: qa-playwright-config
-  backoffLimit: 0
+          resources:
+            requests:
+              cpu: '250m'
+              memory: 512Mi
+            limits:
+              cpu: '1'
+              memory: 2Gi
+          volumeMounts:
+            - name: evidence
+              mountPath: /evidence
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: evidence
+          emptyDir: {}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi

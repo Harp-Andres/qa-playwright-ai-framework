@@ -2,18 +2,28 @@ module.exports = {
   root: true,
   env: {
     es2022: true,
-    node: true
+    node: true,
   },
   parser: '@typescript-eslint/parser',
   parserOptions: {
     project: './tsconfig.json',
-    sourceType: 'module'
+    sourceType: 'module',
   },
   plugins: ['@typescript-eslint'],
-  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'eslint-config-prettier'],
-  ignorePatterns: ['node_modules/', 'playwright-report/', 'test-results/', 'artifacts/'],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'eslint-config-prettier',
+  ],
+  ignorePatterns: [
+    'node_modules/',
+    'playwright-report/',
+    'test-results/',
+    'blob-report/',
+    'artifacts/',
+  ],
   rules: {
     '@typescript-eslint/consistent-type-imports': 'error',
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }]
-  }
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+  },
 };

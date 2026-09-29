@@ -40,7 +40,7 @@ export const getEnvConfig = (): EnvConfig => {
   }
 
   const target = process.env.TEST_ENV ?? 'local';
-  loadEnv({ path: `.env.${target}`, override: true, quiet: true });
+  loadEnv({ path: `.env.${target}`, override: false, quiet: true });
   cachedEnv = parseEnvConfig(process.env);
   return cachedEnv;
 };

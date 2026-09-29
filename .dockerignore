@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+playwright-report
+test-results
+blob-report
+pod-reports
+artifacts
+coverage
+dist
+.git
+.github
+.husky
+.cursor
+**/*.md

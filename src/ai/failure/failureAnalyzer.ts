@@ -1,6 +1,11 @@
 import type { TestInfo } from '@playwright/test';
+import type { FailureCategory } from './failureCategory';
+import {
+  defaultFailureStrategies,
+  type FailureClassificationStrategy,
+} from './failureClassificationStrategy';
 
-export type FailureCategory = 'locator' | 'timeout' | 'network' | 'assertion' | 'unknown';
+export type { FailureCategory } from './failureCategory';
 
 export interface FailureSignal {
   testId: string;
@@ -12,25 +17,15 @@ export interface FailureSignal {
 }
 
 export class FailureAnalyzer {
-  static analyze(testInfo: TestInfo, metadata: Record<string, unknown>): FailureSignal {
-    const message = testInfo.errors[0]?.message ?? 'Unknown failure';
-    const lower = message.toLowerCase();
+  constructor(
+    private readonly strategies: readonly FailureClassificationStrategy[] = defaultFailureStrategies,
+  ) {}
 
-    const category: FailureCategory =
-      lower.includes('self-healing locator') || lower.includes('locator')
-        ? 'locator'
-        : lower.includes('timeout')
-          ? 'timeout'
-          : lower.includes('network') ||
-              lower.includes('net::err') ||
-              lower.includes('err_name_not_resolved') ||
-              lower.includes('econnrefused') ||
-              lower.includes('econnreset') ||
-              lower.includes('etimedout')
-            ? 'network'
-            : lower.includes('expect')
-              ? 'assertion'
-              : 'unknown';
+  analyze(testInfo: TestInfo, metadata: Record<string, unknown>): FailureSignal {
+    const message = testInfo.errors[0]?.message ?? 'Unknown failure';
+    const category =
+      this.strategies.find((strategy) => strategy.matches(message.toLowerCase()))?.category ??
+      'unknown';
 
     return {
       testId: testInfo.titlePath.join(' > '),

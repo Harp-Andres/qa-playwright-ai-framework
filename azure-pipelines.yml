@@ -1,7 +1,8 @@
 trigger:
   branches:
     include:
-      - feature/playwright-ai-framework
+      - main
+      - feature/*
 
 pool:
   vmImage: ubuntu-latest
@@ -14,17 +15,17 @@ steps:
   - script: npm ci
     displayName: Install dependencies
 
-  - script: npx playwright install --with-deps chromium
-    displayName: Install Playwright browsers
-
   - script: npm run lint
     displayName: Lint
 
-  - script: npm run test:web:qa
-    displayName: Run web suite
+  - script: npm run build
+    displayName: Type-check
 
-  - script: npm run test:api:qa
-    displayName: Run API suite
+  - script: npm run test:unit
+    displayName: Unit tests
+
+  - script: bash scripts/ci-playwright-k8s.sh
+    displayName: Run Playwright on Kubernetes
 
   - task: PublishTestResults@2
     condition: always()
@@ -32,3 +33,38 @@ steps:
       testResultsFormat: JUnit
       testResultsFiles: 'test-results/**/*.xml'
       failTaskOnFailedTests: true
+
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    displayName: Publish Playwright HTML report
+    inputs:
+      targetPath: playwright-report
+      artifact: playwright-html-report
+
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    displayName: Publish per-pod reports
+    inputs:
+      targetPath: pod-reports
+      artifact: pod-reports
+
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    displayName: Publish test results
+    inputs:
+      targetPath: test-results
+      artifact: test-results
+
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    displayName: Publish blob report
+    inputs:
+      targetPath: blob-report
+      artifact: blob-report
+
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    displayName: Publish AI artifacts
+    inputs:
+      targetPath: artifacts
+      artifact: ai-artifacts

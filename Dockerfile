@@ -7,4 +7,6 @@ RUN npm ci
 
 COPY . .
 
+ENV TEST_ENV=qa
+
 CMD ["npm", "run", "test:all:qa"]

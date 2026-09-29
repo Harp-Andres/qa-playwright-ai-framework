@@ -8,6 +8,7 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+pod-reports/
 artifacts/
 
 # env

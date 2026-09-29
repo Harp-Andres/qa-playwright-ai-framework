@@ -6,4 +6,6 @@ services:
     volumes:
       - ./playwright-report:/app/playwright-report
       - ./test-results:/app/test-results
+      - ./blob-report:/app/blob-report
+      - ./artifacts:/app/artifacts
     command: npm run test:all:qa

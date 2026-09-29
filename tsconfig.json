@@ -14,5 +14,11 @@
     "types": ["node"],
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src", "tests", "playwright.config.ts", "vitest.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "playwright.config.ts",
+    "playwright.merge.config.ts",
+    "vitest.config.ts"
+  ]
 }

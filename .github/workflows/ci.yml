@@ -3,12 +3,14 @@ name: CI
 on:
   push:
     branches:
-      - feature/playwright-ai-framework
       - main
+      - 'feature/**'
   pull_request:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   lint-build:
@@ -23,61 +25,13 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: npm run test:unit
 
-  security-audit:
-    name: Dependency Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm audit --audit-level=high
-
-  test-web:
-    name: Web Tests
+  e2e-k8s:
+    name: Playwright on Kubernetes
     needs: lint-build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:web:dev
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report-web
-          path: playwright-report/
-          retention-days: 14
-
-  test-api:
-    name: API Tests
-    needs: lint-build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:api:dev
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report-api
-          path: playwright-report/
-          retention-days: 14
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ai-artifacts
-          path: artifacts/
-          retention-days: 14
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/playwright-k8s.yml

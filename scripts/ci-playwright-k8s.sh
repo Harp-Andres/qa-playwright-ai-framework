@@ -105,9 +105,10 @@ if (( ${#zips[@]} == 0 )); then
   echo "No blob reports were collected from the pods"
   merge_status=1
 else
+  # merge-reports writes report.jsonl beside the blobs, so this mount stays writable.
   if ! docker run --rm \
     --entrypoint npx \
-    -v "${PWD}/blob-report:/blob:ro" \
+    -v "${PWD}/blob-report:/blob" \
     -v "${PWD}/playwright-report:/app/playwright-report" \
     -v "${PWD}/test-results:/app/test-results" \
     -e TEST_ENV=qa \

@@ -89,10 +89,18 @@ for pod in "${pods[@]}"; do
     cp -a "${dest}/artifacts/." "artifacts/${pod}/" || true
   fi
 
-  exit_code="$(kubectl exec "${pod}" -- cat /app/shard-exit-code 2>/dev/null || echo 1)"
-  exit_code="${exit_code//$'\r'/}"
+  raw_exit="$(kubectl exec "${pod}" -- cat /app/shard-exit-code 2>/dev/null | head -n 1 || true)"
+  exit_code="$(printf '%s' "${raw_exit}" | tr -cd '0-9')"
+  if [[ -z "${exit_code}" ]]; then
+    exit_code=1
+  fi
+  echo "Pod ${pod} shard exit ${exit_code}"
+  echo "::notice title=${pod}::shard exit ${exit_code}"
   if [[ "${exit_code}" != "0" ]]; then
     job_status=1
+    kubectl logs "${pod}" --tail=40 2>/dev/null | while IFS= read -r line; do
+      echo "::error title=${pod}::${line}"
+    done || true
   fi
   kubectl exec "${pod}" -- touch /app/shard-collected >/dev/null 2>&1 || true
 done

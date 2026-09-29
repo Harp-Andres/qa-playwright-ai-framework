@@ -35,6 +35,9 @@ export default defineConfig({
     video: 'on',
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    },
   },
   projects: [
     {

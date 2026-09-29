@@ -159,54 +159,54 @@ El contrato de la suite es el mismo en local, Docker y Kubernetes: `npm run test
 
 ### Kubernetes local
 
-| Paso                 | Herramienta                                    | Qué hace                                                                                                                                              |
-| -------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Imagen            | Docker                                         | `docker build -t qa-playwright-ai-framework:latest .`                                                                                                 |
-| 2. Clúster           | kind                                           | Carga la imagen en el nodo (`kind load`).                                                                                                             |
-| 3. Entorno           | `kubectl` + `k8s/configmap.yaml`               | Publica las variables de QA. Las credenciales son las públicas de SauceDemo.                                                                          |
-| 4. Suite             | `kubectl` + `k8s/job.yaml`                     | Job indexado: un Pod por shard (`SHARD_TOTAL`, hoy 2). `imagePullPolicy: Never`.                                                                      |
-| 5. Mock API          | Playwright `webServer`                         | Sigue en `127.0.0.1:4010` dentro de cada contenedor.                                                                                                  |
-| 6. Evidencia del Pod | `scripts/k8s-playwright-shard.sh` + `emptyDir` | Cada Pod guarda su HTML, JUnit, JSON, blob, trazas, screenshots, video y artefactos de AI en `/evidence`.                                             |
-| 7. Copia             | `kubectl cp`                                   | Baja cada Pod a `pod-reports/<pod>/`.                                                                                                                 |
-| 8. Reporte oficial   | `npx playwright merge-reports`                 | Fusiona los blob de todos los Pods. El HTML resultante incluye trazas, screenshots y video. El mismo comando escribe el JUnit y el JSON consolidados. |
+| Paso                 | Herramienta                       | Qué hace                                                                                                                                                                                                    |
+| -------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Imagen            | Docker                            | `docker build -t qa-playwright-ai-framework:latest .`                                                                                                                                                       |
+| 2. Clúster           | kind                              | Carga la imagen en el nodo (`kind load`).                                                                                                                                                                   |
+| 3. Entorno           | `kubectl` + `k8s/configmap.yaml`  | Publica las variables de QA. Las credenciales son las públicas de SauceDemo.                                                                                                                                |
+| 4. Suite             | `kubectl` + `k8s/job.yaml`        | Job indexado: un Pod por shard (`SHARD_TOTAL`, hoy 2). `imagePullPolicy: Never`.                                                                                                                            |
+| 5. Mock API          | Playwright `webServer`            | Sigue en `127.0.0.1:4010` dentro de cada contenedor.                                                                                                                                                        |
+| 6. Evidencia del Pod | `scripts/k8s-playwright-shard.sh` | Cada Pod deja su HTML, JUnit, JSON, blob, trazas, screenshots, video y artefactos de AI en `/app`, escribe `/app/shard-exit-code` y sigue vivo hasta que existe `/app/shard-collected` (máximo 15 minutos). |
+| 7. Copia             | `kubectl cp` + `kubectl exec`     | Baja cada Pod a `pod-reports/<pod>/` mientras el contenedor sigue corriendo y luego crea `/app/shard-collected` para liberarlo. Un Pod terminado ya no admite `kubectl cp`.                                 |
+| 8. Reporte oficial   | `npx playwright merge-reports`    | Fusiona los blob de todos los Pods. El HTML resultante incluye trazas, screenshots y video. El mismo comando escribe el JUnit y el JSON consolidados.                                                       |
 
 ### GitHub Actions — CI
 
 Archivo: `.github/workflows/ci.yml`. Corre en push a `main` y `feature/**`, y en pull requests.
 
-| Paso            | Herramienta                            | Qué hace                                                        |
-| --------------- | -------------------------------------- | --------------------------------------------------------------- |
-| 1. Checkout     | `actions/checkout@v4`                  | Clona el repo.                                                  |
-| 2. Runtime      | `actions/setup-node@v4` (Node 20)      | Prepara Node y la caché de npm.                                 |
-| 3. Quality gate | npm + ESLint + `tsc` + Vitest          | `npm ci`, `npm run lint`, `npm run build`, `npm run test:unit`. |
-| 4. E2E          | `.github/workflows/playwright-k8s.yml` | Solo si el paso 3 pasa.                                         |
+| Paso            | Herramienta                                                    | Qué hace                                                                                                                                                                               |
+| --------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Checkout     | `actions/checkout@v4`                                          | Clona el repo.                                                                                                                                                                         |
+| 2. Runtime      | `actions/setup-node@v4` (Node 20)                              | Prepara Node y la caché de npm.                                                                                                                                                        |
+| 3. Quality gate | npm + ESLint + `tsc` + Vitest                                  | `npm ci`, `npm run lint`, `npm run build`, `npm run test:unit`.                                                                                                                        |
+| 4. E2E          | `.github/workflows/playwright-k8s.yml`                         | Solo si el paso 3 pasa.                                                                                                                                                                |
+| 5. GitHub Pages | `actions/upload-pages-artifact@v3` + `actions/deploy-pages@v4` | Solo en push a `main`. Publica el HTML oficial en `https://harp-andres.github.io/qa-playwright-ai-framework/`, también cuando la suite falla. Pages debe estar en modo GitHub Actions. |
 
 ### GitHub Actions — Playwright en Kubernetes
 
 Archivo reutilizable: `.github/workflows/playwright-k8s.yml`. Lo llaman CI y CD. El script es `scripts/ci-playwright-k8s.sh`.
 
-| Paso                 | Herramienta                                                    | Qué hace                                                                                                     |
-| -------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| 1. Checkout          | `actions/checkout@v4`                                          | Clona el repo en el runner.                                                                                  |
-| 2. Clúster           | kind `v0.33.0` + `kindest/node` 1.37.0                         | Crea el clúster `qa-playwright` si no existe.                                                                |
-| 3. Cliente           | kubectl (release estable de Kubernetes)                        | Aplica el ConfigMap y el Job.                                                                                |
-| 4. Imagen            | Docker                                                         | Construye `qa-playwright-ai-framework:latest` y la carga en kind.                                            |
-| 5. Suite             | Kubernetes Job indexado                                        | Un Pod por shard. Espera hasta 15 minutos. Si falla, deja logs de todos los Pods.                            |
-| 6. Evidencia por Pod | `kubectl cp`                                                   | Cada Pod queda en `pod-reports/<pod>/` (HTML, XML, trazas, blob).                                            |
-| 7. Reporte oficial   | `playwright merge-reports` + `playwright.merge.config.ts`      | Un HTML con trazas, screenshots y video, más `test-results/results.xml` y `results.json`.                    |
-| 8. Artefactos        | `actions/upload-artifact@v4`                                   | Sube el reporte oficial, `pod-reports`, `test-results`, `blob-report` y `artifacts` siempre, 14 días.        |
-| 9. GitHub Pages      | `actions/upload-pages-artifact@v3` + `actions/deploy-pages@v4` | En push a `main`, publica el HTML oficial en la página del repo. Hay que tener Pages en modo GitHub Actions. |
+| Paso                 | Herramienta                                               | Qué hace                                                                                                           |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 1. Checkout          | `actions/checkout@v4`                                     | Clona el repo en el runner.                                                                                        |
+| 2. Clúster           | kind `v0.33.0` + `kindest/node` 1.37.0                    | Crea el clúster `qa-playwright` si no existe.                                                                      |
+| 3. Cliente           | kubectl (release estable de Kubernetes)                   | Aplica el ConfigMap y el Job.                                                                                      |
+| 4. Imagen            | Docker                                                    | Construye `qa-playwright-ai-framework:latest` y la carga en kind.                                                  |
+| 5. Suite             | Kubernetes Job indexado                                   | Un Pod por shard. Espera hasta 15 minutos. Si falla, deja logs de todos los Pods.                                  |
+| 6. Evidencia por Pod | `kubectl cp`                                              | Cada Pod queda en `pod-reports/<pod>/` (HTML, XML, trazas, blob). El job falla si algún Pod no entrega su blob.    |
+| 7. Reporte oficial   | `playwright merge-reports` + `playwright.merge.config.ts` | Un HTML con trazas, screenshots y video, más `test-results/results.xml` y `results.json`. Exige un blob por shard. |
+| 8. Artefactos        | `actions/upload-artifact@v4`                              | Sube el reporte oficial, `pod-reports`, `test-results`, `blob-report` y `artifacts` siempre, 14 días.              |
 
 ### GitHub Actions — CD
 
 Archivo: `.github/workflows/cd.yml`. Solo en push a `main`.
 
-| Paso           | Herramienta                     | Qué hace                                 |
-| -------------- | ------------------------------- | ---------------------------------------- |
-| 1. E2E         | El mismo workflow de Kubernetes | La imagen no se publica si el Job falla. |
-| 2. Login       | `docker/login-action@v3`        | Entra a `ghcr.io` con `GITHUB_TOKEN`.    |
-| 3. Tags        | `docker/metadata-action@v5`     | Tag corto del SHA y `latest`.            |
-| 4. Publicación | `docker/build-push-action@v6`   | Construye y empuja `ghcr.io/<repo>`.     |
+| Paso           | Herramienta                     | Qué hace                                                   |
+| -------------- | ------------------------------- | ---------------------------------------------------------- |
+| 1. E2E         | El mismo workflow de Kubernetes | La imagen no se publica si el Job falla. CD no toca Pages. |
+| 2. Login       | `docker/login-action@v3`        | Entra a `ghcr.io` con `GITHUB_TOKEN`.                      |
+| 3. Tags        | `docker/metadata-action@v5`     | Tag corto del SHA y `latest`.                              |
+| 4. Publicación | `docker/build-push-action@v6`   | Construye y empuja `ghcr.io/<repo>`.                       |
 
 ### GitHub Actions — seguridad
 
@@ -267,23 +267,24 @@ kubectl delete job qa-playwright-tests --ignore-not-found
 kubectl apply -f k8s/job.yaml
 ```
 
-Cada Pod deja su evidencia en `/evidence`. Para armar el reporte oficial con las herramientas de Playwright:
+Cada Pod deja su evidencia en `/app` y espera a que la recojan. Cuando todos tienen `/app/shard-exit-code`, se arma el reporte oficial con las herramientas de Playwright:
 
 ```bash
 mkdir -p pod-reports blob-report
-for pod in $(kubectl get pods -l job-name=qa-playwright-tests -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}'); do
-  mkdir -p "pod-reports/${pod}/blob-report"
-  kubectl cp "${pod}:/evidence/playwright-report" "pod-reports/${pod}/playwright-report"
-  kubectl cp "${pod}:/evidence/test-results" "pod-reports/${pod}/test-results"
-  kubectl cp "${pod}:/evidence/blob-report" "pod-reports/${pod}/blob-report"
-  kubectl cp "${pod}:/evidence/artifacts" "pod-reports/${pod}/artifacts"
-  cp "pod-reports/${pod}/blob-report/"*.zip "blob-report/${pod}.zip" || true
+for pod in $(kubectl get pods -l job-name=qa-playwright-tests -o name | sed 's|pod/||'); do
+  for dir in playwright-report test-results blob-report artifacts; do
+    mkdir -p "pod-reports/${pod}/${dir}"
+    kubectl cp "${pod}:/app/${dir}/." "pod-reports/${pod}/${dir}"
+  done
+  cp "pod-reports/${pod}/blob-report/"*.zip "blob-report/${pod}.zip"
+  kubectl exec "${pod}" -- cat /app/shard-exit-code
+  kubectl exec "${pod}" -- touch /app/shard-collected
 done
 
 npx playwright merge-reports -c playwright.merge.config.ts blob-report
 ```
 
-`playwright-report/index.html` es el reporte oficial. `pod-reports/` conserva el HTML, el XML y las trazas de cada Pod. En push a `main`, CI y CD publican ese HTML en GitHub Pages.
+`playwright-report/index.html` es el reporte oficial. `pod-reports/` conserva el HTML, el XML y las trazas de cada Pod. En push a `main`, CI publica ese HTML en GitHub Pages.
 
 ## 9) Calidad local
 

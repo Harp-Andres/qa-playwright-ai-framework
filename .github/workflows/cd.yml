@@ -8,16 +8,10 @@ on:
 permissions:
   contents: read
   packages: write
-  pages: write
-  id-token: write
 
 jobs:
   e2e-k8s:
     name: Playwright on Kubernetes
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     uses: ./.github/workflows/playwright-k8s.yml
 
   publish-image:

@@ -75,14 +75,22 @@ for pod in "${pods[@]}"; do
   mkdir -p "${dest}/playwright-report" "${dest}/test-results" "${dest}/blob-report" "${dest}/artifacts"
   kubectl cp "${pod}:/app/playwright-report/." "${dest}/playwright-report" || true
   kubectl cp "${pod}:/app/test-results/." "${dest}/test-results" || true
-  kubectl cp "${pod}:/app/blob-report/." "${dest}/blob-report" || true
+  if ! kubectl cp "${pod}:/app/blob-report/." "${dest}/blob-report"; then
+    echo "::error title=${pod}::could not copy blob-report from the pod"
+    job_status=1
+  fi
   kubectl cp "${pod}:/app/artifacts/." "${dest}/artifacts" || true
 
   shopt -s nullglob
-  for zip in "${dest}/blob-report/"*.zip; do
+  pod_zips=("${dest}/blob-report/"*.zip)
+  shopt -u nullglob
+  if (( ${#pod_zips[@]} == 0 )); then
+    echo "::error title=${pod}::no blob report zip, this shard is missing from the merged report"
+    job_status=1
+  fi
+  for zip in "${pod_zips[@]}"; do
     cp "${zip}" "blob-report/${pod}-$(basename "${zip}")"
   done
-  shopt -u nullglob
 
   if [[ -d "${dest}/artifacts" ]]; then
     mkdir -p "artifacts/${pod}"
@@ -109,6 +117,10 @@ merge_status=0
 shopt -s nullglob
 zips=(blob-report/*.zip)
 shopt -u nullglob
+if (( ${#zips[@]} != completions )); then
+  echo "::error::expected ${completions} blob reports (one per shard), collected ${#zips[@]}"
+  merge_status=1
+fi
 if (( ${#zips[@]} == 0 )); then
   echo "No blob reports were collected from the pods"
   merge_status=1

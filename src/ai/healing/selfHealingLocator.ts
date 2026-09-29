@@ -14,6 +14,9 @@ export interface LocatorAttempt {
   success: boolean;
 }
 
+const PRIMARY_TIMEOUT_MS = 10_000;
+const FALLBACK_TIMEOUT_MS = 2_000;
+
 export class SelfHealingLocator {
   constructor(private readonly page: Page) {}
 
@@ -22,9 +25,14 @@ export class SelfHealingLocator {
 
     for (const [index, selector] of selectors.entries()) {
       const locator = this.toLocator(selector);
+      // isVisible() does not wait, so a page still loading would skip every selector.
       const isVisible = await locator
         .first()
-        .isVisible({ timeout: 2_000 })
+        .waitFor({
+          state: 'visible',
+          timeout: index === 0 ? PRIMARY_TIMEOUT_MS : FALLBACK_TIMEOUT_MS,
+        })
+        .then(() => true)
         .catch(() => false);
 
       const attempt: LocatorAttempt = {
